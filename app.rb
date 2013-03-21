@@ -36,74 +36,78 @@ def get_users_tasks(user, tasklist = '@default')
 	api_client.execute(tasks_api.tasks.list, 'tasklist' => tasklist)
 end
 
-to_do = {}
+def process
+  to_do = {}
 
-USERS.each do |user|
-	result = get_users_tasks(user)
+  USERS.each do |user|
+    result = get_users_tasks(user)
 
-	if result.status == 200
-		tasks = result.data
-	else
-		puts "#{user}: An error occurred: #{result.data}"
-		next
-  end
-  puts user
-  puts tasks.inspect
+    if result.status == 200
+      tasks = result.data
+    else
+      puts "#{user}: An error occurred: #{result.data}"
+      next
+    end
+    puts user
+    puts tasks.inspect
 
-	tasks['items'].each do |task|
-		words = (task['notes'] ? task['notes'].split(' ') : []) + (task['title'] ? task['title'].split(' ') : [])
-    puts 'All words:' + words.inspect
-		words = words.find_all { |x| x[0] == '@' }
-    puts 'with @' + words.inspect
-		next if words.empty?
+    tasks['items'].each do |task|
+      words = (task['notes'] ? task['notes'].split(' ') : []) + (task['title'] ? task['title'].split(' ') : [])
+      puts 'All words:' + words.inspect
+      words = words.find_all { |x| x[0] == '@' }
+      puts 'with @' + words.inspect
+      next if words.empty?
 
 
-		words.each do |word|
-			word = word[1..-1] # Strip out the @
-      word = word.downcase
-      puts word
-      if USERS.include?(word + '@procnc.com')
-        to_do[word + '@procnc.com'] ||= []
-        to_do[word + '@procnc.com'] << { title: task['title'], notes: task['notes'], referencer: user.split('@')[0] }
+      words.each do |word|
+        word = word[1..-1] # Strip out the @
+        word = word.downcase
+        puts word
+        if USERS.include?(word + '@procnc.com')
+          to_do[word + '@procnc.com'] ||= []
+          to_do[word + '@procnc.com'] << { title: task['title'], notes: task['notes'], referencer: user.split('@')[0] }
+        end
       end
-		end
-	end
-end
+    end
+  end
 
-USERS.each do |user|
-  client = build_client(user)
-  tasks_api = client.discovered_api('tasks', 'v1')
+  USERS.each do |user|
+    client = build_client(user)
+    tasks_api = client.discovered_api('tasks', 'v1')
 
-  res = client.execute(api_method: tasks_api.tasklists.list)
-  res.data['items'].each do |tasklist|
-    if tasklist.title[0] == '@'
-      client.execute(api_method: tasks_api.tasklists.delete,
-                     parameters: {'tasklist' => tasklist['id']})
+    res = client.execute(api_method: tasks_api.tasklists.list)
+    res.data['items'].each do |tasklist|
+      if tasklist.title[0] == '@'
+        client.execute(api_method: tasks_api.tasklists.delete,
+                       parameters: {'tasklist' => tasklist['id']})
+      end
+    end
+  end
+
+  to_do.each do |user, tasks|
+    client = build_client(user)
+    tasks_api = client.discovered_api('tasks', 'v1')
+
+    tasks.each do |task|
+      # Does referencer tasklikt exist?
+      list = false
+      client.execute(tasks_api.tasklists.list).data['items'].each do |item| # Go through each list
+        list = item['id'] if item['title'] == '@' + task[:referencer] # Find list
+      end
+
+      unless list
+        res = client.execute(api_method: tasks_api.tasklists.insert, # Make the list
+                             body: JSON.dump({ 'title' => '@' + task[:referencer] }),
+                             headers: {'Content-Type' => 'application/json'})
+        list = res.data.id
+      end
+
+      client.execute(api_method: tasks_api.tasks.insert, # Make the task
+                     parameters: { 'tasklist' => list },
+                     body: JSON.dump({ 'title' => task[:title], 'notes' => task[:notes] }),
+                     headers: {'Content-Type' => 'application/json'})
     end
   end
 end
 
-to_do.each do |user, tasks|
-  client = build_client(user)
-  tasks_api = client.discovered_api('tasks', 'v1')
-
-  tasks.each do |task|
-    # Does referencer tasklikt exist?
-    list = false
-    client.execute(tasks_api.tasklists.list).data['items'].each do |item| # Go through each list
-      list = item['id'] if item['title'] == '@' + task[:referencer] # Find list
-    end
-
-    unless list
-      res = client.execute(api_method: tasks_api.tasklists.insert, # Make the list
-                           body: JSON.dump({ 'title' => '@' + task[:referencer] }),
-                           headers: {'Content-Type' => 'application/json'})
-      list = res.data.id
-    end
-
-    client.execute(api_method: tasks_api.tasks.insert, # Make the task
-                   parameters: { 'tasklist' => list },
-                   body: JSON.dump({ 'title' => task[:title], 'notes' => task[:notes] }),
-                   headers: {'Content-Type' => 'application/json'})
-  end
-end
+process
