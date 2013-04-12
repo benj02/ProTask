@@ -65,7 +65,7 @@ def process
         puts word
         if USERS.include?(word + '@procnc.com')
           to_do[word + '@procnc.com'] ||= []
-          to_do[word + '@procnc.com'] << { title: task['title'], notes: task['notes'], due: task['due'], status: task['status'], referencer: user.split('@')[0] }
+          to_do[word + '@procnc.com'] << { title: task['title'], notes: task['notes'], due: task['due'], referencer: user.split('@')[0] }
         end
       end
     end
@@ -104,7 +104,7 @@ def process
 
       client.execute(api_method: tasks_api.tasks.insert, # Make the task
                      parameters: { 'tasklist' => list },
-                     body: JSON.dump({ 'title' => task[:title], 'notes' => task[:notes], 'due' => task[:due], 'status' => task[:status] }),
+                     body: JSON.dump({ 'title' => task[:title], 'notes' => task[:notes], 'due' => task[:due] }),
                      headers: {'Content-Type' => 'application/json'})
       puts "for user '#{user}'' made task '#{task[:title]}'' in list '#{task[:referencer]}'"
     end
