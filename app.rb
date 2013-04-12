@@ -104,8 +104,9 @@ def process
 
       client.execute(api_method: tasks_api.tasks.insert, # Make the task
                      parameters: { 'tasklist' => list },
-                     body: JSON.dump({ 'title' => task[:title], 'notes' => task[:notes], 'due' => task[:due], 'status' => task[:status]}),
+                     body: JSON.dump({ 'title' => task[:title], 'notes' => task[:notes], 'due' => task[:due], 'status' => task[:status] }),
                      headers: {'Content-Type' => 'application/json'})
+      puts "for user '#{user}'' made task '#{task[:title]}'' in list '#{task[:referencer]}'"
     end
   end
 end
